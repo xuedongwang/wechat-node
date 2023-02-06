@@ -13,6 +13,9 @@ const TOKEN = 'WECHAT';
 
 const API = {
   GET_ACCESS_TOKEN: `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${APPID}&secret=${APPSECRET}`,
+  MENU: {
+    CREATE: (ACCESS_TOKEN) => `https://api.weixin.qq.com/cgi-bin/menu/create?access_token=${ACCESS_TOKEN}`
+  }
 }
 
 const router = new Router();
@@ -129,8 +132,48 @@ router.post('/', (ctx, next) => {
 
 
 router.get('/get_access_token', async(ctx, next) => {
+  console.log(API.GET_ACCESS_TOKEN)
 
   const response = await axios.get(API.GET_ACCESS_TOKEN)
+  // const response = await fetch('https://github.com/');
+  // ctx.body = response.json();
+  // console.log(result);
+  ctx.body = response.data;
+});
+
+router.get('/menu/create', async(ctx, next) => {
+
+  const data = {
+    "button":[
+    {	
+         "type":"click",
+         "name":"今日歌曲",
+         "key":"V1001_TODAY_MUSIC"
+     },
+     {
+          "name":"菜单",
+          "sub_button":[
+          {	
+              "type":"view",
+              "name":"搜索",
+              "url":"http://www.soso.com/"
+           },
+           {
+                "type":"miniprogram",
+                "name":"wxa",
+                "url":"http://mp.weixin.qq.com",
+                "appid":"wx286b93c14bbf93aa",
+                "pagepath":"pages/lunar/index"
+            },
+           {
+              "type":"click",
+              "name":"赞一下我们",
+              "key":"V1001_GOOD"
+           }]
+      }]
+}
+
+  const response = await axios.post(API.MENU.CREATE('65_MTsZhxTqN1lQWGOSb-LzDnj1eJZxXriIeb6mGgZd9YwPjkqrf6r6GEKvs4afH6QXsefAAPHGntYIMVZ6zQqS1wweZH-QdYbQTStBG1RvTS4FmHrqInNF9hWfYPEGZHiABABUC'), data)
   // const response = await fetch('https://github.com/');
   // ctx.body = response.json();
   // console.log(result);
