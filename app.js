@@ -1,9 +1,13 @@
+const path = require('path');
+const fs = require('fs');
 const Koa = require('koa');
 const sha1 = require('sha1');
 var bodyParser = require('koa-bodyparser');
 const Router = require('@koa/router');
 var convert = require('xml-js');
-const axios = require('axios');
+const fetch = require('node-fetch');
+const koaStatic = require('koa-static');
+const FormData = require('form-data');
 
 const app = new Koa();
 
@@ -14,9 +18,18 @@ const TOKEN = 'WECHAT';
 const API = {
   GET_ACCESS_TOKEN: `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${APPID}&secret=${APPSECRET}`,
   MENU: {
-    CREATE: (ACCESS_TOKEN) => `https://api.weixin.qq.com/cgi-bin/menu/create?access_token=${ACCESS_TOKEN}`
+    CREATE: ACCESS_TOKEN => `https://api.weixin.qq.com/cgi-bin/menu/create?access_token=${ACCESS_TOKEN}`,
+    LIST: ACCESS_TOKEN => `https://api.weixin.qq.com/cgi-bin/get_current_selfmenu_info?access_token=${ACCESS_TOKEN}`,
+    DELETE: ACCESS_TOKEN => `https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=${ACCESS_TOKEN}`
+  },
+  MEDIA: {
+    TEMP: {
+      UPLOAD: (ACCESS_TOKEN, TYPE) => `https https://api.weixin.qq.com/cgi-bin/media/upload?access_token=${ACCESS_TOKEN}&type=${TYPE}`
+    }
   }
 }
+
+const ACCESS_TOKEN = '65_iGWvq9ikI-SY68BRmbnYNbJZ-EyQifiEFXcQo2-M6fukb2txvDKq2Bpg0t49g3tXdr-QEIkOFH1K361JTN77nfKyU92pVE2sULUqWkllu6EaTRQXnqJn-lovjL8HHSaAIASSD'
 
 const router = new Router();
 
@@ -51,134 +64,141 @@ router.post('/', (ctx, next) => {
   const picUrl = xml?.PicUrl?._cdata;
   const msgContent = xml?.Content?._cdata;
   const mediaId = xml?.MediaId?._cdata;
-  
 
-  if(msgType === 'text') {
-    ctx.body = `<xml>
+  const content = `当前接收到的消息为：${msgType}消息
+全部支持的消息有：
+1. 文本消息
+2. 图片消息
+3. 语音消息
+4. 视频消息
+5. 小视频消息
+6. 地理位置消息
+7. 链接消息`;
+  ctx.body = `<xml>
       <ToUserName><![CDATA[${fromUser}]]></ToUserName>
       <FromUserName><![CDATA[${toUser}]]></FromUserName>
       <CreateTime>${Date.now()}</CreateTime>
       <MsgType><![CDATA[text]]></MsgType>
-      <Content><![CDATA[${JSON.stringify(xml, null, 2)}]]></Content>
+      <Content><![CDATA[${content}]]></Content>
     </xml>`;
-  } else if (msgType === 'image') {
-    ctx.body = `<xml>
-    <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-    <FromUserName><![CDATA[${toUser}]]></FromUserName>
-    <CreateTime>${Date.now()}</CreateTime>
-    <MsgType><![CDATA[${msgType}]]></MsgType>
-    <Image>
-      <MediaId><![CDATA[${mediaId}]]></MediaId>
-    </Image>
-  </xml>`;
-  }else if (msgType === 'voice') {
-    ctx.body = `<xml>
-    <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-    <FromUserName><![CDATA[${toUser}]]></FromUserName>
-    <CreateTime>${Date.now()}</CreateTime>
-    <MsgType><![CDATA[${msgType}]]></MsgType>
-    <Voice>
-      <MediaId><![CDATA[${mediaId}]]></MediaId>
-    </Voice>
-  </xml>`;
-  }else if (msgType === 'video') {
-    ctx.body = `<xml>
-    <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-    <FromUserName><![CDATA[${toUser}]]></FromUserName>
-    <CreateTime>${Date.now()}</CreateTime>
-    <MsgType><![CDATA[${msgType}]]></MsgType>
-    <Video>
-      <MediaId><![CDATA[${mediaId}]]></MediaId>
-      <Title><![CDATA[${msgType}]]></Title>
-      <Description><![CDATA[${msgType}描述]]></Description>
-    </Video>
-  </xml>`;
-  }else if (msgType === 'music') {
-    ctx.body = `<xml>
-    <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-    <FromUserName><![CDATA[${toUser}]]></FromUserName>
-    <CreateTime>${Date.now()}</CreateTime>
-    <MsgType><![CDATA[${msgType}]]></MsgType>
-    <Music>
-      <Title><![CDATA[TITLE]]></Title>
-      <Description><![CDATA[DESCRIPTION]]></Description>
-      <MusicUrl><![CDATA[MUSIC_Url]]></MusicUrl>
-      <HQMusicUrl><![CDATA[HQ_MUSIC_Url]]></HQMusicUrl>
-      <ThumbMediaId><![CDATA[media_id]]></ThumbMediaId>
-    </Music>
-  </xml>`;
-  }else if (msgType === 'voice') {
-    ctx.body = `<xml>
-    <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-    <FromUserName><![CDATA[${toUser}]]></FromUserName>
-    <CreateTime>${Date.now()}</CreateTime>
-    <MsgType><![CDATA[${msgType}]]></MsgType>
-    <Voice>
-      <MediaId><![CDATA[${mediaId}]]></MediaId>
-    </Voice>
-  </xml>`;
-  }else {
-    ctx.body = `<xml>
-      <ToUserName><![CDATA[${fromUser}]]></ToUserName>
-      <FromUserName><![CDATA[${toUser}]]></FromUserName>
-      <CreateTime>${Date.now()}</CreateTime>
-      <MsgType><![CDATA[${msgType}]]></MsgType>
-      <Content><![CDATA[${JSON.stringify(xml, null, 2)}]]></Content>
-    </xml>`;
-  }
-
-
 });
 
 
 router.get('/get_access_token', async(ctx, next) => {
   console.log(API.GET_ACCESS_TOKEN)
 
-  const response = await axios.get(API.GET_ACCESS_TOKEN)
-  // const response = await fetch('https://github.com/');
-  // ctx.body = response.json();
-  // console.log(result);
-  ctx.body = response.data;
+  const response = await fetch(API.GET_ACCESS_TOKEN)
+  const body = await response.json();
+  console.log(body)
+  ctx.body = body;
 });
 
 router.get('/menu/create', async(ctx, next) => {
 
   const data = {
-    "button":[
-    {	
-         "type":"click",
-         "name":"今日歌曲",
-         "key":"V1001_TODAY_MUSIC"
-     },
-     {
-          "name":"菜单",
-          "sub_button":[
-          {	
-              "type":"view",
-              "name":"搜索",
-              "url":"http://www.soso.com/"
-           },
-           {
-                "type":"miniprogram",
-                "name":"wxa",
-                "url":"http://mp.weixin.qq.com",
-                "appid":"wx286b93c14bbf93aa",
-                "pagepath":"pages/lunar/index"
-            },
-           {
-              "type":"click",
-              "name":"赞一下我们",
-              "key":"V1001_GOOD"
-           }]
-      }]
+    "button": [
+        {
+            "name": "扫码", 
+            "sub_button": [
+                {
+                    "type": "scancode_waitmsg", 
+                    "name": "扫码带提示", 
+                    "key": "rselfmenu_0_0", 
+                    "sub_button": [ ]
+                }, 
+                {
+                    "type": "scancode_push", 
+                    "name": "扫码推事件", 
+                    "key": "rselfmenu_0_1", 
+                    "sub_button": [ ]
+                }
+            ]
+        }, 
+        {
+            "name": "发图", 
+            "sub_button": [
+                {
+                    "type": "pic_sysphoto", 
+                    "name": "系统拍照发图", 
+                    "key": "rselfmenu_1_0", 
+                   "sub_button": [ ]
+                 }, 
+                {
+                    "type": "pic_photo_or_album", 
+                    "name": "拍照或者相册发图", 
+                    "key": "rselfmenu_1_1", 
+                    "sub_button": [ ]
+                }, 
+                {
+                    "type": "pic_weixin", 
+                    "name": "微信相册发图", 
+                    "key": "rselfmenu_1_2", 
+                    "sub_button": [ ]
+                }
+            ]
+        }, 
+        {
+            "name": "发送位置", 
+            "type": "location_select", 
+            "key": "rselfmenu_2_0"
+        },
+    ]
 }
 
-  const response = await axios.post(API.MENU.CREATE('65_MTsZhxTqN1lQWGOSb-LzDnj1eJZxXriIeb6mGgZd9YwPjkqrf6r6GEKvs4afH6QXsefAAPHGntYIMVZ6zQqS1wweZH-QdYbQTStBG1RvTS4FmHrqInNF9hWfYPEGZHiABABUC'), data)
-  // const response = await fetch('https://github.com/');
-  // ctx.body = response.json();
-  // console.log(result);
-  ctx.body = response.data;
+  const response = await fetch(API.MENU.CREATE(ACCESS_TOKEN), {
+    method: 'post',
+	  body: JSON.stringify(data),
+	  headers: {'Content-Type': 'application/json'}
+  })
+
+  const result = await response.json();
+
+  ctx.body = result;
 });
+router.get('/menu/list', async(ctx, next) => {
+  const response = await fetch(API.MENU.LIST(ACCESS_TOKEN))
+
+  const result = await response.json();
+
+  ctx.body = result;
+})
+
+router.get('/menu/delete', async(ctx, next) => {
+  const response = await fetch(API.MENU.DELETE(ACCESS_TOKEN))
+
+  const result = await response.json();
+
+  ctx.body = result;
+})
+
+router.get('/menu/delete', async(ctx, next) => {
+  const response = await fetch(API.MENU.DELETE(ACCESS_TOKEN))
+
+  const result = await response.json();
+
+  ctx.body = result;
+})
+
+
+router.get('/upload', async(ctx,next) => {
+  let fileStream = fs.readFileSync(path.join(__dirname, './static/test.jpg'));//读取文件
+  let formdata = new FormData();
+  formdata.append("file", fileStream, {
+      filename: "./test.png",//上传的文件名
+      // filepath: 'test.jpg',
+      contentType: 'image/png',//文件类型标识
+    //knownLength: fileStream.length
+  });
+  console.log(API.MEDIA.TEMP.UPLOAD(ACCESS_TOKEN, 'image'))
+const result = await fetch(API.MEDIA.TEMP.UPLOAD(ACCESS_TOKEN, 'image'), {
+    body: formdata,
+    method: "POST",//请求方式
+    headers: formdata.getHeaders()
+})
+  ctx.body = result
+})
+
+app.use(koaStatic(path.join(__dirname, '../static'), {}));
 
 app.use(bodyParser({
   enableTypes: ['json','form','text','xml']
